@@ -195,6 +195,14 @@ def main():
         action="store_true",
         help="Enable debug logging for detailed output."
     )
+    parser.add_argument(
+        "--username",
+        help="Username for HTTP Basic Authentication (if required)"
+    )
+    parser.add_argument(
+        "--password",
+        help="Password for HTTP Basic Authentication (if required)"
+    )
     args = parser.parse_args()
 
     # --- Setup Logging ---
@@ -220,6 +228,12 @@ def main():
     logging.info(f"Found {len(scanned_pages)} already scanned pages. Resuming progress.")
 
     session = requests.Session()
+
+    # Setup authentication if provided
+    auth = None
+    if args.username and args.password:
+        auth = (args.username, args.password)
+        logging.info("Using HTTP Basic Authentication")
     page_num = START_PAGE
     total_permalinks_found = 0
 
@@ -239,7 +253,7 @@ def main():
             while retries < max_retries:
                 try:
                     logging.debug(f"Requesting URL: {url}")
-                    response = session.get(url, impersonate=IMPERSONATE_BROWSER, timeout=20)
+                    response = session.get(url, impersonate=IMPERSONATE_BROWSER, timeout=20, auth=auth)
                     logging.debug(f"Received status code {response.status_code} for {url}")
 
                     if response.status_code == 200:

@@ -40,6 +40,12 @@ Find and catalog every post URL on your blog:
 python 01_get.py "https://yourblog.typepad.com/blog/"
 ```
 
+**For password-protected blogs:**
+
+```bash
+python 01_get.py "https://yourblog.typepad.com/blog/" --username your_username --password your_password
+```
+
 **Output:** Creates `permalinks.txt` containing all post URLs
 
 #### Step 2: Archive Posts and Media
@@ -48,6 +54,12 @@ Download all posts and their associated media:
 
 ```bash
 python 02_posts.py "https://yourblog.typepad.com/blog/"
+```
+
+**For password-protected blogs:**
+
+```bash
+python 02_posts.py "https://yourblog.typepad.com/blog/" --username your_username --password your_password
 ```
 
 **Output:** Creates `posts/` folder with your complete archive
@@ -185,6 +197,8 @@ This script acts as a web crawler to discover the URL of every single post on yo
       - `blog_url`: (Required) The main URL of your blog, like `"https://yourblog.typepad.com/blog/"`.
       - `--sleep-time <seconds>`: The amount of time to wait between fetching pages. Default is `0.5`.
       - `--debug`: Shows extra detailed information while the script is running.
+      - `--username <username>`: Username for password-protected blogs (if required).
+      - `--password <password>`: Password for password-protected blogs (if required).
 
 #### 02\_posts.py - Content Archiving
 
@@ -199,6 +213,8 @@ This script reads the list of URLs from `permalinks.txt` and downloads the full 
       - `--threads <number>`: How many downloads to run at the same time. Default is `4`.
       - `--sleep-time <seconds>`: How long each worker should wait after downloading a post. Default is `0.5`.
       - `--debug`: Shows extra detailed information, which can be helpful for troubleshooting.
+      - `--username <username>`: Username for password-protected blogs (if required).
+      - `--password <password>`: Password for password-protected blogs (if required).
 
 #### 03\_prepare\_media.py - Media Processing
 

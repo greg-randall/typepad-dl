@@ -81,7 +81,7 @@ def get_asset_filename_from_url(asset_url):
     
     return filename
 
-def download_and_rewrite_css_imports(session, css_url, css_content, assets_dir):
+def download_and_rewrite_css_imports(session, css_url, css_content, assets_dir, auth=None):
     """
     Downloads CSS and recursively downloads any @import or url() references.
     Returns modified CSS content with rewritten URLs.
@@ -102,7 +102,7 @@ def download_and_rewrite_css_imports(session, css_url, css_content, assets_dir):
             asset_save_path = os.path.join(assets_dir, asset_filename)
             
             if not os.path.exists(asset_save_path):
-                success = download_file(session, full_asset_url, asset_save_path)
+                success = download_file(session, full_asset_url, asset_save_path, auth=auth)
                 if not success:
                     continue
             
@@ -118,7 +118,7 @@ def download_and_rewrite_css_imports(session, css_url, css_content, assets_dir):
     
     return modified_css
 
-def download_page_assets(session, html_content, base_url, assets_dir):
+def download_page_assets(session, html_content, base_url, assets_dir, auth=None):
     """
     Downloads all CSS, JS, fonts and other assets referenced in the HTML.
     Returns modified HTML with rewritten asset URLs.
@@ -135,10 +135,10 @@ def download_page_assets(session, html_content, base_url, assets_dir):
                 filename = get_asset_filename_from_url(full_url)
                 save_path = os.path.join(assets_dir, filename)
                 if not os.path.exists(save_path):
-                    response = session.get(full_url, impersonate=IMPERSONATE_BROWSER, timeout=5)
+                    response = session.get(full_url, impersonate=IMPERSONATE_BROWSER, timeout=5, auth=auth)
                     if response.status_code == 200:
                         modified_css = download_and_rewrite_css_imports(
-                            session, full_url, response.text, assets_dir)
+                            session, full_url, response.text, assets_dir, auth)
                         with open(save_path, 'w', encoding='utf-8') as f:
                             f.write(modified_css)
                         assets_downloaded[href] = filename
@@ -156,7 +156,7 @@ def download_page_assets(session, html_content, base_url, assets_dir):
                 filename = get_asset_filename_from_url(full_url)
                 save_path = os.path.join(assets_dir, filename)
                 if not os.path.exists(save_path):
-                    if download_file(session, full_url, save_path):
+                    if download_file(session, full_url, save_path, auth=auth):
                         assets_downloaded[src] = filename
                 else:
                     assets_downloaded[src] = filename
@@ -172,7 +172,7 @@ def download_page_assets(session, html_content, base_url, assets_dir):
                 filename = get_asset_filename_from_url(full_url)
                 save_path = os.path.join(assets_dir, filename)
                 if not os.path.exists(save_path):
-                    if download_file(session, full_url, save_path):
+                    if download_file(session, full_url, save_path, auth=auth):
                         assets_downloaded[href] = filename
                 else:
                     assets_downloaded[href] = filename
@@ -248,12 +248,12 @@ def detect_file_extension_from_content(content):
     if content.startswith(b'RIFF') and b'WEBP' in content[:12]: return '.webp'
     return None
 
-def download_file(session, url, save_path, fail_fast_on_500=False):
+def download_file(session, url, save_path, fail_fast_on_500=False, auth=None):
     for attempt in range(MAX_RETRIES):
         try:
             extension = None
             try:
-                head_response = session.head(url, impersonate=IMPERSONATE_BROWSER, timeout=5)
+                head_response = session.head(url, impersonate=IMPERSONATE_BROWSER, timeout=5, auth=auth)
                 if head_response.status_code == 200:
                     content_type = head_response.headers.get('Content-Type', '')
                     extension = get_file_extension_from_content_type(content_type)
@@ -262,7 +262,7 @@ def download_file(session, url, save_path, fail_fast_on_500=False):
             except Exception:
                 pass
             
-            response = session.get(url, impersonate=IMPERSONATE_BROWSER, timeout=5)
+            response = session.get(url, impersonate=IMPERSONATE_BROWSER, timeout=5, auth=auth)
             if response.status_code == 200:
                 if not extension:
                     extension = detect_file_extension_from_content(response.content)
@@ -291,7 +291,7 @@ def download_file(session, url, save_path, fail_fast_on_500=False):
     tqdm.write(f"ERROR: Failed to download {url} after {MAX_RETRIES} attempts.")
     return False
 
-def process_url(post_index, url, blog_base_url, blog_name, session, lock, sleep_time):
+def process_url(post_index, url, blog_base_url, blog_name, session, lock, sleep_time, auth=None):
     stats = {"posts_processed": 0, "media_downloaded": 0, "media_failed": 0}
     blog_domain = urlparse(blog_base_url).netloc
     
@@ -302,7 +302,7 @@ def process_url(post_index, url, blog_base_url, blog_name, session, lock, sleep_
     html_content = None
     for attempt in range(MAX_RETRIES):
         try:
-            response = session.get(url, impersonate=IMPERSONATE_BROWSER, timeout=5)
+            response = session.get(url, impersonate=IMPERSONATE_BROWSER, timeout=5, auth=auth)
             if response.status_code == 200:
                 html_content = response.text
                 break
@@ -327,7 +327,7 @@ def process_url(post_index, url, blog_base_url, blog_name, session, lock, sleep_
     with open(html_save_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
     try:
-        modified_html = download_page_assets(session, html_content, url, ASSETS_DIR)
+        modified_html = download_page_assets(session, html_content, url, ASSETS_DIR, auth)
         with open(html_save_path, 'w', encoding='utf-8') as f:
             f.write(modified_html)
     except Exception:
@@ -393,10 +393,10 @@ def process_url(post_index, url, blog_base_url, blog_name, session, lock, sleep_
 
             success = False
             if len(urls_to_try) > 1:
-                success = download_file(session, urls_to_try[0], media_save_path, fail_fast_on_500=True)
+                success = download_file(session, urls_to_try[0], media_save_path, fail_fast_on_500=True, auth=auth)
 
             if not success:
-                success = download_file(session, urls_to_try[-1], media_save_path)
+                success = download_file(session, urls_to_try[-1], media_save_path, auth=auth)
             
             if success:
                 stats["media_downloaded"] += 1
@@ -419,6 +419,8 @@ def main():
     parser.add_argument("--threads", type=int, default=4, help="Number of concurrent download threads (default: 4).")
     parser.add_argument("--sleep-time", type=float, default=0.5, help="Seconds for a worker to sleep after finishing a post (default: 0.5).")
     parser.add_argument("--debug", action="store_true", help="Enable debug output.")
+    parser.add_argument("--username", help="Username for HTTP Basic Authentication (if required)")
+    parser.add_argument("--password", help="Password for HTTP Basic Authentication (if required)")
     args = parser.parse_args()
     DEBUG_MODE = args.debug
 
@@ -463,14 +465,20 @@ def main():
     
     session = requests.Session()
     file_lock = threading.Lock()
-    
+
+    # Setup authentication if provided
+    auth = None
+    if args.username and args.password:
+        auth = (args.username, args.password)
+        logging.info("Using HTTP Basic Authentication")
+
     total_stats = {"posts_processed": 0, "media_downloaded": 0, "media_failed": 0}
 
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.threads) as executor:
             # Submit all tasks to the executor at once.
             future_to_url = {
-                executor.submit(process_url, i, url, BLOG_BASE_URL, blog_name, session, file_lock, args.sleep_time): url
+                executor.submit(process_url, i, url, BLOG_BASE_URL, blog_name, session, file_lock, args.sleep_time, auth): url
                 for url, i in urls_to_process_with_index.items()
             }
             
